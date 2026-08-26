@@ -343,9 +343,13 @@ char number[3];
 #seek 5;
 } dtmfcontact[16];
 
+#seekto 0x1D00;
+u8 ext_scanlists[207];
+u8 ext_scanlists_marker;
+
 struct {
     struct {
-        #seekto 0x1E00;
+	#seekto 0x1E00;
         u8 openRssiThr[10];
         #seekto 0x1E10;
         u8 closeRssiThr[10];
@@ -681,8 +685,10 @@ RTE_LIST = ["OFF", "100ms", "200ms", "300ms", "400ms",
             "500ms", "600ms", "700ms", "800ms", "900ms", "1000ms"]
 VOX_LIST = ["OFF", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10"]
 
+EXT_SCANLIST_MARKER = 0xA5
+
 MEM_SIZE = 0x2000 # size of all memory
-PROG_SIZE = 0x1d00  # size of the memory that we will write
+PROG_SIZE = 0x1e00  # size of the memory that we will write
 MEM_BLOCK = 0x80  # largest block of memory that we can reliably write
 CAL_START = 0x1E00  # calibration memory start address
 F4HWN_START =0x1FF2 # calibration F4HWN memory start address
@@ -713,7 +719,22 @@ BANDS_WIDE = {
         }
 
 SCANLIST_LIST = ["None ", "List [1]", "List [2]", "List [1, 2]", "List [3]", "List [1, 3]", "List [2, 3]", "All List [1, 2, 3]"]
-SCANLIST_SELECT_LIST = ["LIST [0] NO LIST ", "LIST [1]", "LIST [2]", "LIST [3]", "LISTS [1, 2, 3]", "All Channel (ALL)"]
+SCANLIST_SELECT_LIST = [
+    "LIST [0] NO LIST",
+    "LIST [1]",
+    "LIST [2]",
+    "LIST [3]",
+    "LIST [4]",
+    "LIST [5]",
+    "LIST [6]",
+    "LIST [7]",
+    "LIST [8]",
+    "LIST [9]",
+    "LIST [10]",
+    "LIST [11]",
+    "LISTS [1-11]",
+    "All Channels (ALL)",
+]
 
 DTMF_CHARS = "0123456789ABCD*# "
 DTMF_CHARS_ID = "0123456789ABCDabcd"
@@ -1280,11 +1301,18 @@ class UVK5RadioEgzumer(chirp_common.CloneModeRadio):
         # We'll also look at the channel attributes if a memory has them
         tmpscn = 0
         tmp_comp = 0
+        ext_scan_mask = 0
         if ch_num < 200:
             _mem3 = self._memobj.ch_attr[ch_num]
             # scanlists
             tmpscn = _mem3.is_scanlistx
             tmp_comp = list_def(_mem3.compander, COMPANDER_LIST, 0)
+
+            stored_mask = int(self._memobj.ext_scanlists[ch_num])
+            marker = int(self._memobj.ext_scanlists_marker)
+
+            if marker == EXT_SCANLIST_MARKER or stored_mask != 0xFF:
+                ext_scan_mask = stored_mask
         elif ch_num < 214:
             att_num = 200 + int((ch_num - 200) / 2)
             _mem3 = self._memobj.ch_attr[att_num]
@@ -1328,6 +1356,16 @@ class UVK5RadioEgzumer(chirp_common.CloneModeRadio):
             val = RadioSettingValueList(SCANLIST_LIST)
             rs = RadioSetting("scanlists", "Scanlists", val)
             mem.extra.append(rs)
+
+            if ch_num < 200:
+                for bank in range(4, 12):
+                    val = RadioSettingValueBoolean(False)
+                    rs = RadioSetting(
+                        "scanbank%d" % bank,
+                        "Scan Bank %d" % bank,
+                        val
+                    )
+                    mem.extra.append(rs)
 
             # actually the step and duplex are overwritten by chirp based on
             # bandplan. they are here to document sane defaults for IARU r1
@@ -1459,6 +1497,20 @@ class UVK5RadioEgzumer(chirp_common.CloneModeRadio):
         rs = RadioSetting("scanlists", "Scanlists (SList)", val)
         rs.set_doc('SList: Is this frequency is part of a scan list?')
         mem.extra.append(rs)
+
+        if ch_num < 200:
+            for bank in range(4, 12):
+                enabled = bool(ext_scan_mask & (1 << (bank - 4)))
+                val = RadioSettingValueBoolean(enabled)
+                rs = RadioSetting(
+                    "scanbank%d" % bank,
+                    "Scan Bank %d" % bank,
+                    val
+                )
+                rs.set_doc(
+                    "Include this channel in scan bank %d." % bank
+                )
+                mem.extra.append(rs)
 
         return mem
 
@@ -3488,6 +3540,16 @@ class UVK5RadioEgzumer(chirp_common.CloneModeRadio):
         _mem_chan = self._memobj.channel[number]
         _mem_attr = self._memobj.ch_attr[att_num]
 
+        # Initialize the extended scan-list area once. Preserve masks
+        # already written by the bank-4 proof of concept, but convert
+        # erased bytes to no membership.
+        if int(self._memobj.ext_scanlists_marker) != EXT_SCANLIST_MARKER:
+            for index in range(207):
+                if int(self._memobj.ext_scanlists[index]) == 0xFF:
+                    self._memobj.ext_scanlists[index] = 0
+
+            self._memobj.ext_scanlists_marker = EXT_SCANLIST_MARKER
+
         _mem_attr.is_scanlistx = 0x7
         _mem_attr.compander = 0
         _mem_attr.band = 0x7
@@ -3498,6 +3560,7 @@ class UVK5RadioEgzumer(chirp_common.CloneModeRadio):
             if number < 200:
                 _mem_chname = self._memobj.channelname[number]
                 _mem_chname.set_raw("\xFF" * 16)
+                self._memobj.ext_scanlists[number] = 0
             return memory
 
         # find band
@@ -3573,5 +3636,12 @@ class UVK5RadioEgzumer(chirp_common.CloneModeRadio):
         if number < 200:
             tmp_val = get_setting("scanlists", 0)
             _mem_attr.is_scanlistx = tmp_val
+
+            ext_scan_mask = 0
+            for bank in range(4, 12):
+                if get_setting("scanbank%d" % bank, False):
+                    ext_scan_mask |= 1 << (bank - 4)
+
+            self._memobj.ext_scanlists[number] = ext_scan_mask
 
         return memory
