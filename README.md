@@ -24,7 +24,7 @@ The primary change in this fork is support for **eleven scan banks**. A memory c
 
 ## Installation
 
-Download `uvk5_egzumer_f4hwn.py` from this repository or from the latest release.
+Download `uvk5_egzumer_f4hwn_ver_4_3_0.py` from this repository or from the latest release.
 
 ### Enable developer mode in CHIRP
 
@@ -42,7 +42,7 @@ The external driver must be loaded each time CHIRP is restarted:
 
 1. In CHIRP, select **File → Load Module**.
 2. Accept the warning about loading an external module.
-3. Browse to `uvk5_egzumer_f4hwn.py` and open it.
+3. Browse to `uvk5_egzumer_f4hwn_ver_4_3_0.py` and open it.
 4. Confirm that CHIRP reports the module as loaded.
 
 ## Downloading From the Radio
