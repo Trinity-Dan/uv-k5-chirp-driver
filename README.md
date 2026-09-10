@@ -1,30 +1,32 @@
 # UV-K5 CHIRP Driver — KN2Q Eleven Scan Banks
 
-This repository contains a modified CHIRP driver for Quansheng radios running the matching KN2Q build of the F4HWN firmware.
+This repository contains the matching CHIRP driver for **KN2Q firmware v1.0.0** on supported Quansheng UV-K1 and UV-K5 V3 radios.
 
-The primary change in this fork is support for **eleven scan banks**. A memory channel can be assigned independently to any combination of Scan Banks 1–11, making it easier to organize channels by purpose without duplicating them. For example, the same channel can belong to local, travel, amateur-radio, public-safety monitoring, or event-specific banks.
+The KN2Q firmware and driver extend the inherited three-list system to **eleven independent scan banks**. A memory channel can belong to any combination of Scan Banks 1–11, making it possible to organize channels by location, service, activity, or operating role without creating duplicate memories.
 
 ## Compatibility
 
-- Quansheng UV-K5 family radios supported by the corresponding F4HWN firmware
-- UV-K1, UV-K5 V3, and Fusion variants supported by the upstream driver
-- The matching KN2Q firmware build with eleven-scan-bank support
+- KN2Q firmware v1.0.0
+- Quansheng UV-K1 using the PY32F071 MCU
+- Quansheng UV-K5 V3 using the PY32F071 MCU
+- Fusion builds made from the matching KN2Q firmware source
 - CHIRP next/daily builds with developer mode and external-module loading
 
 > [!IMPORTANT]
-> This driver changes how scan-bank membership is stored in the radio. Use it only with a matching firmware build that supports eleven scan banks. Using an incompatible driver or firmware may produce incorrect settings or channel data.
+> This driver uses the KN2Q eleven-bank memory format. Use it only with matching KN2Q firmware. An incompatible stock or F4HWN driver may omit or misinterpret the extended scan-bank data.
 
 ## Features
 
 - Eleven independently selectable scan banks
 - Multiple scan-bank memberships per memory channel
-- Scan-bank configuration through CHIRP's **Extra** fields and radio settings
-- Support for the settings and features inherited from the F4HWN CHIRP driver
-- English interface text
+- Per-channel Bank 1–11 controls in CHIRP's **Extra** fields
+- Radio-wide selection of Bank 0, Banks 1–11, combined `1-11`, and `ALL` modes
+- Compatibility with the on-radio `ScAdd1`–`ScAdd3` and `ScAd4`–`ScAd11` controls
+- Support for the settings inherited from the F4HWN 4.3 driver
 
 ## Installation
 
-Download `uvk5_egzumer_f4hwn.py` from this repository or from the latest release.
+Download `uvk5_kn2q.py` from this repository or from the corresponding release.
 
 ### Enable developer mode in CHIRP
 
@@ -40,53 +42,74 @@ This normally needs to be done only once:
 
 The external driver must be loaded each time CHIRP is restarted:
 
-1. In CHIRP, select **File → Load Module**.
-2. Accept the warning about loading an external module.
-3. Browse to `uvk5_egzumer_f4hwn.py` and open it.
+1. Select **File → Load Module**.
+2. Accept the external-module warning.
+3. Browse to `uvk5_kn2q.py` and open it.
 4. Confirm that CHIRP reports the module as loaded.
 
 ## Downloading From the Radio
 
 1. Turn on the radio normally.
-2. Insert the programming cable fully into the radio, then connect it to the computer.
-3. In CHIRP, select **Radio → Download From Radio**.
+2. Insert the programming cable fully, then connect it to the computer.
+3. Select **Radio → Download From Radio** in CHIRP.
 4. Select the correct serial port.
-5. Select the Quansheng/F4HWN entry supplied by the loaded driver.
-6. Click **OK** and wait for the download to complete.
-7. Save the downloaded image before making changes. This gives you a backup of the radio's current configuration.
+5. Select the Quansheng/F4HWN entry supplied by the loaded module.
+6. Click **OK** and wait for the download to finish.
+7. Save an untouched copy of the downloaded image before making changes.
 
 ## Using the Eleven Scan Banks
 
-In the **Memories** tab, use the channel's **Extra** fields to select its scan-bank memberships. Each channel can belong to one bank, several banks, or no banks.
+In the **Memories** tab, enable **Show Extra Fields** and use each channel's Bank 1–11 fields to select its memberships. A channel can belong to one bank, several banks, or no banks.
 
-The radio-wide scan-bank settings are available under **Settings**. The exact labels shown in CHIRP may vary slightly with the CHIRP and firmware versions.
+The active scan mode is available under **Settings**:
 
-After editing the configuration, select **Radio → Upload To Radio**. Do not disconnect the cable or turn off the radio until the upload finishes.
+- `0` scans channels assigned to no bank.
+- `1`–`11` scan the selected bank.
+- `1-11` scans the union of all eleven banks.
+- `ALL` scans all programmed channels.
+
+Membership can also be changed on the radio. Use `ScAdd1` through `ScAdd3` for the legacy banks and `ScAd4` through `ScAd11` for the extended banks.
+
+After editing, select **Radio → Upload To Radio**. Do not disconnect the cable or turn off the radio until the upload finishes.
 
 ## Recommended First Use
 
-Before uploading anything:
+1. Flash the matching KN2Q firmware.
+2. Perform **Reset All** on the radio.
+3. Load `uvk5_kn2q.py` in CHIRP.
+4. Download a fresh image from the reset radio.
+5. Save that untouched image as a backup.
+6. Add or edit a small number of channels and upload them.
+7. Confirm normal button, receive, transmit, and scan-bank operation before completing the configuration.
 
-1. Download the radio with this driver.
-2. Save an untouched backup image.
-3. Make a small test change.
-4. Upload it and confirm that the radio operates correctly.
+## Troubleshooting
 
-Keep the backup image in case you need to restore the original configuration.
+If a button press unexpectedly causes transmit behavior or other controls act incorrectly after changing firmware or driver versions:
+
+1. Perform **Reset All** on the radio.
+2. Download a fresh image with the matching KN2Q driver.
+3. Add the desired channels to that fresh image.
+4. Upload it to the radio.
+
+Do not reuse an image produced by an incompatible driver when diagnosing this behavior.
 
 ## Notes and Limitations
 
 - This is an external development driver and is not included with standard CHIRP installations.
 - A CHIRP update may require the module to be loaded again or may temporarily affect compatibility.
-- The eleven-bank format requires the matching KN2Q firmware and driver versions.
 - Always download from the radio before uploading a configuration created with a different driver version.
+- Keep an untouched backup of a known-good radio image.
+
+## Related Firmware
+
+Use the matching [KN2Q firmware for the UV-K1 and UV-K5 V3](https://github.com/Trinity-Dan/uv-k1-k5v3-firmware-kn2q).
 
 ## Credits
 
-This project is based on the CHIRP driver created for the F4HWN firmware, which in turn grew from the Quansheng UV-K5 community and Egzumer firmware ecosystem.
+This project is based on the CHIRP driver for F4HWN firmware, which grew from the Quansheng UV-K5 and Egzumer firmware ecosystem.
 
-Many thanks to F4HWN, the original driver authors and contributors, the CHIRP developers, and the wider UV-K5 community. This fork focuses on extending the existing scan-list implementation from three banks to eleven while retaining the upstream driver's other capabilities.
+Many thanks to F4HWN, the original driver authors and contributors, the CHIRP developers, and the wider UV-K5 community. This fork focuses on extending the multi-bank system from three banks to eleven while keeping the inherited capabilities and authorship recognized.
 
 ## Disclaimer
 
-This software is provided without warranty. You are responsible for maintaining a backup and for ensuring that your radio is programmed and operated in accordance with applicable laws, license conditions, and local frequency-use restrictions.
+This software is provided without warranty. You are responsible for maintaining backups and ensuring that your radio is programmed and operated in accordance with applicable laws, license conditions, band plans, and local frequency-use restrictions.
